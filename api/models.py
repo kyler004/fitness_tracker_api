@@ -99,3 +99,76 @@ class WorkoutSession(models.Model):
             models.Index(fields=['user', '-start_time']), 
             models.Index(fields=['workout_type']), 
         ]
+
+class WorkoutMetric(models.Model): 
+    """Time series data for workout metrics (heart rate, speed, etc. at specific timestamps)"""
+    session = models.ForeignKey(
+        WorkoutSession, 
+        on_delete=models.CASCADE, 
+        related_name='metrics'
+    ) 
+
+    # Timestamp for this metric reading
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    # Metric values (all optional as different )
+    heart_rate = models.IntegerField(
+        null=True, 
+        blank=True, 
+        validators=[MinValueValidator(30), MaxValueValidator(250)],
+        help_text="Hert rate in BPM"
+    )
+    speed = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Speed in km/h"
+    )
+    distance = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Cumulative distance in km"
+    )
+    cadence = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Steps/strides per minute"
+    )
+    power = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Power output in watts (for cycling)"
+    )
+    elevation = models.DecimalField(
+        max_digits=7, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Elevation in meters"
+    )
+
+    # For weight training 
+    weight_lifted = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Weight in kg"
+    )
+    reps = models.IntegerField(null=True, blank=True, help_text="Number of repetitions")
+    sets = models.IntegerField(null=True, blank=True, help_text="Number of sets")
+
+    def __str__(self): 
+        return f"Metric for {self.session.title} at {self.timestamp}"
+    
+    class Meta: 
+        ordering = ['timestamp']
+        verbose_name = "Workout Metric"
+        verbose_name_plural = "Workout Metrics"
+        indexes = [
+            models.Index(fields=['session', 'timestamp']), 
+            models.Index(fields=['timestamp']), 
+        ]
