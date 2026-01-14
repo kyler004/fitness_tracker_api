@@ -5,6 +5,7 @@ from django.utils import timezone
 
 # Create your models here.
 
+# Custom user
 class UserProfile(models.Model): 
     """Extended user profile with fitness-related information"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='fitness_profile')
