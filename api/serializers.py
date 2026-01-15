@@ -133,4 +133,50 @@ class WorkoutSessionCreateSerializer(serializers.ModelSerializer):
             for metric_data in metrics_data: 
                 WorkoutMetric.objects.create(session=instance, **metric_data)
             return instance
-        
+
+# Aggregator serializers
+class WorkoutStatsSerializer(serializers.Serializer):
+    """Serailizer for aggregated workout statistics"""
+    period = serializers.CharField(help_text="Time period (day, week, month)")
+    date = serializers.DateField(help_text="Date for this period")
+
+    #  Aggregated statistics
+    total_workouts = serializers.IntegerField()
+    total_duration = serializers.IntegerField(help_text="Total minutes")
+    total_distance = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_calories = serializers.IntegerField()
+    avg_heart_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
+
+    # Workout type breakdown
+    workout_types = serializers.DictField(
+        child=serializers.IntegerField(), 
+        help_text="Count by workout type"
+    )
+
+class WorkoutProgressSerializer(serializers.Serializer):
+    """Serializer for progress tracking over time"""
+    date = serializers.DateField()
+    cumulative_workouts = serializers.IntegerField()
+    cumulative_distance = serializers.DecimalField(max_digits=10, decimal_places=2)
+    cumulative_calories = serializers.IntegerField()
+    cumulative_duration = serializers.IntegerField(help_text="Total minutes")
+
+
+class HeartRateZoneSerializer(serializers.Serializer):
+    """Serializer for heart rate zone analysis"""
+    zone_name = serializers.CharField()
+    zone_range = serializers.CharField(help_text="e.g., '120-140 BPM'")
+    time_in_zone = serializers.IntegerField(help_text="Minutes in this zone")
+    percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+
+
+class WorkoutChartDataSerializer(serializers.Serializer):
+    """Serializer for chart-ready data"""
+    labels = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="X-axis labels (dates, times, etc.)"
+    )
+    datasets = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Array of dataset objects with label, data, and styling"
+    )
