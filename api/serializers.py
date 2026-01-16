@@ -2,32 +2,36 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import UserProfile, WorkoutSession, WorkoutMetric
 
-class UserSerializer(serializers.ModelSerializer): 
+
+class UserSerializer(serializers.ModelSerializer):
     """Basic user serializer"""
-    class Meta: 
+    class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
         read_only_fields = ['id']
 
-class UserProfileSerializer(serializers.ModelSerializer): 
+
+class UserProfileSerializer(serializers.ModelSerializer):
     """User profile with fitness information"""
     user = UserSerializer(read_only=True)
     bmi = serializers.SerializerMethodField()
-
-    class Meta: 
+    
+    class Meta:
         model = UserProfile
         fields = [
-            'id', 'user', 'age', 'weight', 'height', 'fitness_goal', 'bmi', 'created_at', 'updated_at'
+            'id', 'user', 'age', 'weight', 'height', 
+            'fitness_goal', 'bmi', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_bmi(self, obj):
         """Calculate BMI if weight and height are available"""
-        if obj.weight and obj.height: 
-            height_m = float(obj.height) / 100 #Convert the centimeters to meters
-            bmi = float(obj.weight) / (height_m**2)
+        if obj.weight and obj.height:
+            height_m = float(obj.height) / 100  # Convert cm to meters
+            bmi = float(obj.weight) / (height_m ** 2)
             return round(bmi, 2)
         return None
+
 
 class WorkoutMetricSerializer(serializers.ModelSerializer):
     """Serializer for individual workout metrics (time series data)"""
@@ -51,24 +55,26 @@ class WorkoutMetricSerializer(serializers.ModelSerializer):
             )
         return data
 
-class WorkoutSessionSerializer(serializers.ModelSerializer): 
-    """Light weight serializer for listing sessions"""
-    user = serializers.StringRelatedField(read_obly=True)
+
+class WorkoutSessionListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for listing workout sessions"""
+    user = serializers.StringRelatedField(read_only=True)
     workout_type_display = serializers.CharField(
-        source = 'get_workout_type_display', 
+        source='get_workout_type_display', 
         read_only=True
     )
-
-    class Meta: 
+    
+    class Meta:
         model = WorkoutSession
         fields = [
-            'id', 'user', 'workout_type', 'workout_type_display', 
-            'title', 'start_time', 'duration_minutes', 
+            'id', 'user', 'workout_type', 'workout_type_display',
+            'title', 'start_time', 'duration_minutes',
             'total_distance', 'total_calories', 'avg_heart_rate'
         ]
         read_only_fields = ['id', 'user']
 
-class WorkoutSessionDetailserializer(serializers.ModelSerializer): 
+
+class WorkoutSessionDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer with nested metrics for time series data"""
     user = serializers.StringRelatedField(read_only=True)
     workout_type_display = serializers.CharField(
@@ -77,81 +83,84 @@ class WorkoutSessionDetailserializer(serializers.ModelSerializer):
     )
     metrics = WorkoutMetricSerializer(many=True, read_only=True)
     metrics_count = serializers.SerializerMethodField()
-
-    class Meta: 
-        model: WorkoutSession
+    
+    class Meta:
+        model = WorkoutSession
         fields = [
-           'id', 'user', 'workout_type', 'workout_type_display',
+            'id', 'user', 'workout_type', 'workout_type_display',
             'title', 'description', 'start_time', 'end_time',
             'duration_minutes', 'total_distance', 'total_calories',
             'avg_heart_rate', 'max_heart_rate', 'notes',
-            'metrics', 'metrics_count', 'created_at', 'updated_at' 
+            'metrics', 'metrics_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'duration_minutes', 'created_at', 'updated_at']
     
-    def get_metrics_count(self, obj): 
+    def get_metrics_count(self, obj):
         """Count of time series data points"""
         return obj.metrics.count()
 
-class WorkoutSessionCreateSerializer(serializers.ModelSerializer): 
-    """Serializer for creating workout session with optional metrics"""
-    metrics = WorkoutMetricSerializer(many=True, required=False)
 
-    class Meta: 
+class WorkoutSessionCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating workout sessions with optional metrics"""
+    metrics = WorkoutMetricSerializer(many=True, required=False)
+    
+    class Meta:
         model = WorkoutSession
         fields = [
             'workout_type', 'title', 'description', 'start_time',
             'end_time', 'total_distance', 'total_calories',
-            'avg_heart_rate', 'max_heart_rate', 'notes', 'metrics' 
+            'avg_heart_rate', 'max_heart_rate', 'notes', 'metrics'
         ]
-
+    
     def create(self, validated_data):
         """Handle creation of session with nested metrics"""
         metrics_data = validated_data.pop('metrics', [])
-
+        
         # Create the workout session
         session = WorkoutSession.objects.create(**validated_data)
-
+        
         # Create associated metrics
-        for metric_data in metrics_data: 
+        for metric_data in metrics_data:
             WorkoutMetric.objects.create(session=session, **metric_data)
         
         return session
     
-    def update(self, instance, validated_data): 
+    def update(self, instance, validated_data):
         """Handle updating session (metrics updated separately)"""
         metrics_data = validated_data.pop('metrics', None)
-
-        #Update sesoisn fails
-        for attr, value in validated_data.items(): 
+        
+        # Update session fields
+        for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        # If metrics provided, replace existing ones 
-        if metrics_data is not None: 
+        
+        # If metrics provided, replace existing ones
+        if metrics_data is not None:
             instance.metrics.all().delete()
-            for metric_data in metrics_data: 
+            for metric_data in metrics_data:
                 WorkoutMetric.objects.create(session=instance, **metric_data)
-            return instance
+        
+        return instance
 
-# Aggregator serializers
+
 class WorkoutStatsSerializer(serializers.Serializer):
-    """Serailizer for aggregated workout statistics"""
+    """Serializer for aggregated workout statistics"""
     period = serializers.CharField(help_text="Time period (day, week, month)")
     date = serializers.DateField(help_text="Date for this period")
-
-    #  Aggregated statistics
+    
+    # Aggregated metrics
     total_workouts = serializers.IntegerField()
     total_duration = serializers.IntegerField(help_text="Total minutes")
     total_distance = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_calories = serializers.IntegerField()
     avg_heart_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
-
+    
     # Workout type breakdown
     workout_types = serializers.DictField(
-        child=serializers.IntegerField(), 
+        child=serializers.IntegerField(),
         help_text="Count by workout type"
     )
+
 
 class WorkoutProgressSerializer(serializers.Serializer):
     """Serializer for progress tracking over time"""
