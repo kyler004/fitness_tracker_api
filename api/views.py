@@ -212,3 +212,231 @@ class WorkoutSessionViewSet(viewsets.ModelViewSet):
         
         serializer = WorkoutProgressSerializer(results, many=True)
         return Response(serializer.data)
+    
+    # Chart data
+    @action(detail=False, methods=['get'])
+    def chart_data(self, request): 
+        """
+            Get data formated for charting libraries (Chart.js in this case)
+            Query params: metric (calories/distance/duration), period (day/week/month) 
+        """
+        metric = request.query_params.get('metric', 'calories')
+        period = request.query_params.get('period', 'week')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not end_date: 
+            end_date = timezone.now()
+        else: 
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        
+
+        if not start_date: 
+            days = 30 if period == 'day' else 90
+            start_date = end_date - timedelta(days=days)
+        else: 
+            start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        
+        # Choose truncation and aggregation
+        if period == 'day':
+            trunc_func = TruncDate
+        elif period == 'week':
+            trunc_func = TruncWeek
+        else:
+            trunc_func = TruncMonth
+        
+        # Map metric to field
+        metric_field_map = {
+            'calories': 'total_calories',
+            'distance': 'total_distance',
+            'duration': 'duration_minutes',
+            'workouts': 'id'
+        }
+        
+        field = metric_field_map.get(metric, 'total_calories')
+
+        # Aggregate data
+        if metric == 'workouts':
+            data = WorkoutSession.objects.filter(
+                user=request.user,
+                start_time__gte=start_date,
+                start_time__lte=end_date
+            ).annotate(
+                period_date=trunc_func('start_time')
+            ).values('period_date').annotate(
+                value=Count(field)
+            ).order_by('period_date')
+        else:
+            data = WorkoutSession.objects.filter(
+                user=request.user,
+                start_time__gte=start_date,
+                start_time__lte=end_date
+            ).annotate(
+                period_date=trunc_func('start_time')
+            ).values('period_date').annotate(
+                value=Sum(field)
+            ).order_by('period_date')
+        
+        # Format for chart
+        labels = [item['period_date'].strftime('%Y-%m-%d') for item in data]
+        values = [float(item['value'] or 0) for item in data]
+
+        chart_data = {
+            'labels': labels,
+            'datasets': [
+                {
+                    'label': metric.capitalize(),
+                    'data': values,
+                    'backgroundColor': 'rgba(75, 192, 192, 0.2)',
+                    'borderColor': 'rgba(75, 192, 192, 1)',
+                    'borderWidth': 2
+                }
+            ]
+        }
+
+        serializer = WorkoutChartDataSerializer(chart_data)
+        return Response(serializer.data)
+
+    # Heart rate zones
+    @action(detail=True, methods=['get'])
+    def heart_rate_zones(self, request, pk=None):
+        """
+        Analyze heart rate zones for a specific workout
+        Zones: Recovery (50-60%), Aerobic (60-70%), Tempo (70-80%), 
+               Threshold (80-90%), Maximum (90-100%)
+        """
+        session = self.get_object()
+
+        # Get user's max heart rate (estimate: 220 - age)
+        try: 
+            profile = request.user.fitness_profile
+            max_hr = 220 - (profile.age or 30)
+        except: 
+            max_hr = 190 #default
+        
+        # Define zones 
+        zones = [
+            ('Recovery', 0.5, 0.6),
+            ('Aerobic', 0.6, 0.7),
+            ('Tempo', 0.7, 0.8),
+            ('Threshold', 0.8, 0.9),
+            ('Maximum', 0.9, 1.0)
+        ]
+
+        # Get all heart reta metrics for this session
+        metrics = session.metrics.filter(
+            heart_rate__isnull=False
+        ).order_by('timestamp')
+
+        if not metrics.exists(): 
+            return Response(
+                {'detail' : 'No heart rate data available for this workout'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        total_readings = metrics.count()
+        zone_data = []
+
+        for zone_name, lower, upper in zones: 
+            lower_hr = int(max_hr * lower)
+            upper_hr = int(max_hr * upper)
+
+            count = metrics.filter(
+                heart_rate__gte=lower_hr, 
+                heart_rate__lt=upper_hr
+            ).count()
+
+            percentage = (count / total_readings * 100) if total_readings > 0 else 0
+
+            # Estimate time in zone (assuming metrics are evenly spaced)
+            time_in_zone = int((count / total_readings) * (session.duration_minutes or 0))
+            
+            zone_data.append({
+                'zone_name': zone_name,
+                'zone_range': f'{lower_hr}-{upper_hr} BPM',
+                'time_in_zone': time_in_zone,
+                'percentage': round(percentage, 2)
+            })
+        
+        serializer = HeartRateZoneSerializer(zone_data, many=True)
+        return Response(serializer.data)
+    
+    # Summary
+    @action(detail=False, methods=['get'])
+    def summary(self, request): 
+        """
+        Get overall summary statistics for the user
+        
+        :param self: Description
+        :param request: Description
+        """
+        workouts = WorkoutSession.objects.filter(user=request.user)
+
+        summary = workouts.aggregate(
+            total_workouts=Count('id'),
+            total_distance=Sum('total_distance'),
+            total_calories=Sum('total_calories'),
+            total_duration=Sum('duration_minutes'),
+            avg_duration=Avg('duration_minutes'),
+            avg_heart_rate=Avg('avg_heart_rate'),
+            max_distance=Max('total_distance'),
+            favorite_workout=Count('workout_type')
+        )
+
+        # Get workout type distribution
+        type_distribution = workouts.values('workout_type').annotate(
+            count=Count('id'),
+            total_duration=Sum('total_distance')
+        ).order_by('-count')
+
+        # Get recent trend (last 7 days versus previous 7 days)
+        today = timezone.now()
+        last_week = workouts.filter(
+            start_time__gte=today-timedelta(days=7)
+        ).aggregate(
+            count=Count('id'),
+            distance=Sum('total_distance')
+        )
+
+        previous_week = workouts.filter(
+            start_time_gte=today - timedelta(days=14),
+            start_time_lt=today - timedelta(days=7)
+        ).aggregate(
+            count=Count('id'), 
+            distance=Sum('total_distance')
+        )
+
+        return Response({
+            'overall': summary, 
+            'workout_distribution': list(type_distribution), 
+            'recent_trend': {
+                'last_week' : last_week, 
+                'previos_week': previous_week
+            }
+        })
+
+class WorkoutMetricViewSet(viewsets.ModelViewSet):
+    """ViewSet for workout metrics (time series data)"""
+    serializer_class = WorkoutMetricSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get metrics for user's workouts"""
+        session_id = self.request.query_params.get('session_id')
+        queryset = WorkoutMetric.objects.filter(
+            session__user=self.request.user
+        )
+        
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        
+        return queryset.select_related('session')
+    
+    def perform_create(self, serializer):
+        """Validate that the session belongs to the user"""
+        session = serializer.validated_data['session']
+        if session.user != self.request.user:
+            raise serializers.ValidationError(
+                "You can only add metrics to your own workouts"
+            )
+        serializer.save()
