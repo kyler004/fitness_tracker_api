@@ -1,5 +1,5 @@
 """
-URL configuration for fitness_tracker_api project.
+URL configuration for api_tracker_api project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/6.0/topics/http/urls/
@@ -14,9 +14,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# project/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/', include('api.urls')),  # Include the api app URLs
+    path('api-auth/', include('rest_framework.urls')),  # Login/logout for browsable API
 ]
