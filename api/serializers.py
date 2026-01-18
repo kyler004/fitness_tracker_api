@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import UserProfile, WorkoutSession, WorkoutMetric
-
+from .validators import validate_workout_times
 
 class UserSerializer(serializers.ModelSerializer):
     """Basic user serializer"""
@@ -111,6 +111,39 @@ class WorkoutSessionCreateSerializer(serializers.ModelSerializer):
             'end_time', 'total_distance', 'total_calories',
             'avg_heart_rate', 'max_heart_rate', 'notes', 'metrics'
         ]
+    
+    def validate(self, data):
+        '''Validate workout session data'''
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        
+        # Validate times
+        validate_workout_times(start_time, end_time)
+        
+        # Validate that distance is positive
+        total_distance = data.get('total_distance')
+        if total_distance and total_distance < 0:
+            raise serializers.ValidationError({
+                'total_distance': 'Distance cannot be negative'
+            })
+        
+        # Validate that calories is positive
+        total_calories = data.get('total_calories')
+        if total_calories and total_calories < 0:
+            raise serializers.ValidationError({
+                'total_calories': 'Calories cannot be negative'
+            })
+        
+        # Validate heart rate ranges
+        avg_hr = data.get('avg_heart_rate')
+        max_hr = data.get('max_heart_rate')
+        
+        if avg_hr and max_hr and avg_hr > max_hr:
+            raise serializers.ValidationError({
+                'avg_heart_rate': 'Average heart rate cannot exceed maximum heart rate'
+            })
+        
+        return data
     
     def create(self, validated_data):
         """Handle creation of session with nested metrics"""
