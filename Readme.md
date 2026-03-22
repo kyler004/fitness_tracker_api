@@ -18,6 +18,13 @@ You've built a comprehensive Fitness Tracker API with Django REST Framework that
 
 ---
 
+## 🛠️ Recent Updates
+
+- **Module Renaming**: The core application module was renamed from `fitness` to `api` to better align with the endpoint structure.
+- **Reliability Fixes**: Resolved internal syntax and logic errors in `api/views.py` (e.g. fixing undefined variables and bare exceptions) to ensure the backend operates seamlessly.
+
+---
+
 ## 🚀 Complete Setup Instructions
 
 ### 1. Install Dependencies
@@ -36,7 +43,7 @@ fitness_project/
 │   ├── settings.py
 │   ├── urls.py
 │   └── wsgi.py
-└── fitness/
+└── api/
     ├── __init__.py
     ├── apps.py
     ├── models.py
@@ -63,7 +70,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'fitness',
+    'api',
 ]
 
 REST_FRAMEWORK = {
