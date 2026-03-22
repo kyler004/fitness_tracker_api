@@ -22,6 +22,9 @@ You've built a comprehensive Fitness Tracker API with Django REST Framework that
 
 - **Module Renaming**: The core application module was renamed from `fitness` to `api` to better align with the endpoint structure.
 - **Reliability Fixes**: Resolved internal syntax and logic errors in `api/views.py` (e.g. fixing undefined variables and bare exceptions) to ensure the backend operates seamlessly.
+- **Data Integrity**: Fixed a major bug in `api/models.py` where workouts without end times were discarded instead of saved.
+- **Signals**: Combined overlapping signal handlers in `api/signals.py` into a single robust creator and fixed a crashing syntax typo (`User=instance`).
+- **Auth Robustness**: Enhanced the `/api/auth/logout/` endpoint to uniquely check and handle tokens gracefully, preventing internal server errors.
 
 ---
 
