@@ -89,7 +89,7 @@ class WorkoutSession(models.Model):
         if self.end_time and self.start_time: 
             duration = self.end_time - self.start_time
             self.duration_minutes = int(duration.total_seconds() / 60)
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
     
     class Meta: 
         ordering = ['-start_time']

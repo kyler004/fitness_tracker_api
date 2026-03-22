@@ -1,6 +1,6 @@
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
@@ -108,6 +108,7 @@ def login(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def logout(request):
     """
     Logout by deleting the user's token
@@ -115,15 +116,13 @@ def logout(request):
     POST /api/auth/logout/
     Headers: Authorization: Token YOUR_TOKEN_HERE
     """
-    try:
-        # Delete the user's token
+    if hasattr(request.user, 'auth_token'):
         request.user.auth_token.delete()
         return Response({'message': 'Successfully logged out'})
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    return Response(
+        {'error': 'Invalid token or already logged out'},
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
 
 @api_view(['GET'])
