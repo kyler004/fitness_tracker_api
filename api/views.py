@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,7 +6,6 @@ from django.db.models import Count, Sum, Avg, Max, Min, Q
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.utils import timezone
 from datetime import timedelta, datetime
-from collections import defaultdict
 
 from .models import UserProfile, WorkoutSession, WorkoutMetric
 from .serializers import (
@@ -118,11 +117,6 @@ class WorkoutSessionViewSet(viewsets.ModelViewSet):
         # Add workout type breakdown for each period
         results = []
         for stat in stats:
-            period_workouts = workouts.filter(
-                start_time__date=stat['period_date'] if period == 'day'
-                else None
-            )
-            
             # Count by workout type
             type_counts = workouts.filter(
                 start_time__gte=stat['period_date']
@@ -298,7 +292,7 @@ class WorkoutSessionViewSet(viewsets.ModelViewSet):
         try:
             profile = request.user.fitness_profile
             max_hr = 220 - (profile.age or 30)
-        except:
+        except Exception:
             max_hr = 190  # Default
         
         # Define zones
