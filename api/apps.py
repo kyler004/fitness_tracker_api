@@ -13,4 +13,4 @@ class ApiConfig(AppConfig):
         Import signal handlers when the app is ready
         This ensures signals are registered
         """
-        import fitness.signals #noqa
+        import api.signals #noqa

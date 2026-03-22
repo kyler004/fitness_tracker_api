@@ -1,1 +1,1 @@
-default_app_config = 'fitness.apps.FitnessConfig'
+default_app_config = 'api.apps.ApiConfig'

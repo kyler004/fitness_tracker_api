@@ -132,5 +132,5 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'EXCEPTION_HANDLER': 'fitness.exceptions.custom_exception_handler',  # Add this
+    'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',  # Add this
 }

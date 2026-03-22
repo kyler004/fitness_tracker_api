@@ -76,7 +76,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'EXCEPTION_HANDLER': 'fitness.exceptions.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',
 }
 ```
 
@@ -88,7 +88,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('fitness.urls')),
+    path('api/', include('api.urls')),
     path('api-auth/', include('rest_framework.urls')),
 ]
 ```
