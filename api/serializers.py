@@ -153,8 +153,14 @@ class WorkoutSessionCreateSerializer(serializers.ModelSerializer):
         session = WorkoutSession.objects.create(**validated_data)
         
         # Create associated metrics
-        for metric_data in metrics_data:
-            WorkoutMetric.objects.create(session=session, **metric_data)
+        # ⚡ Bolt Optimization: Replaced O(N) objects.create loop with O(1) bulk_create.
+        # This resolves the N+1 write bottleneck for time-series metrics.
+        metrics_to_create = [
+            WorkoutMetric(session=session, **metric_data)
+            for metric_data in metrics_data
+        ]
+        if metrics_to_create:
+            WorkoutMetric.objects.bulk_create(metrics_to_create)
         
         return session
     
@@ -170,8 +176,14 @@ class WorkoutSessionCreateSerializer(serializers.ModelSerializer):
         # If metrics provided, replace existing ones
         if metrics_data is not None:
             instance.metrics.all().delete()
-            for metric_data in metrics_data:
-                WorkoutMetric.objects.create(session=instance, **metric_data)
+            # ⚡ Bolt Optimization: Replaced O(N) objects.create loop with O(1) bulk_create.
+            # Reduces N database inserts to just 1 insert query.
+            metrics_to_create = [
+                WorkoutMetric(session=instance, **metric_data)
+                for metric_data in metrics_data
+            ]
+            if metrics_to_create:
+                WorkoutMetric.objects.bulk_create(metrics_to_create)
         
         return instance
 
